@@ -1,5 +1,6 @@
 import { Exclude } from 'class-transformer';
 import { IsString } from 'class-validator';
+import { Match } from 'src/shared/decorators/matched-password';
 
 export class LoginDTO {
   @IsString()
@@ -14,6 +15,7 @@ export class RegisterDTO extends LoginDTO {
   name: string;
 
   @IsString()
+  @Match('password', { message: 'Passwords do not match' })
   confirmPassword: string;
 }
 
