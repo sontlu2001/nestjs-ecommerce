@@ -26,7 +26,7 @@ export class TokenService {
     });
   }
 
-  verifyAscessToken(token: string): Promise<JwtPayload> {
+  verifyAccessToken(token: string): Promise<JwtPayload> {
     return this.jwtService.verifyAsync(token, {
       secret: process.env.JWT_ACCESS_TOKEN_SECRET,
       algorithms: ['HS256'],

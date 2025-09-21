@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
   LoginDTO,
@@ -8,6 +8,11 @@ import {
   RegisterDTO,
   RegisterResDTO,
 } from './auth.dto';
+import { AccessTokenGuard } from 'src/shared/guards/access-token.guard';
+import { APIkeyGuard } from 'src/shared/guards/api-key.guard';
+import { Auth } from 'src/shared/decorators/auth.decorator';
+import { AuthType, ConditionGuard } from 'src/shared/constants/auth.contant';
+import { AuthenticationGuard } from 'src/shared/guards/auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -19,10 +24,13 @@ export class AuthController {
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   async login(@Body() body: LoginDTO) {
     return new LoginResDTO(await this.authService.login(body));
   }
 
+  @Auth([AuthType.ApiKey, AuthType.Bearer], { condition: ConditionGuard.OR })
+  @UseGuards(AuthenticationGuard)
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   async refreshToken(@Body() body: RefreshTokenBodyDTO) {
