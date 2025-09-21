@@ -10,8 +10,6 @@ import {
   RegisterDTO,
   RegisterResDTO,
 } from './auth.dto';
-import { AccessTokenGuard } from 'src/shared/guards/access-token.guard';
-import { APIkeyGuard } from 'src/shared/guards/api-key.guard';
 import { Auth } from 'src/shared/decorators/auth.decorator';
 import { AuthType, ConditionGuard } from 'src/shared/constants/auth.contant';
 import { AuthenticationGuard } from 'src/shared/guards/auth.guard';
@@ -32,7 +30,6 @@ export class AuthController {
   }
 
   @Auth([AuthType.ApiKey, AuthType.Bearer], { condition: ConditionGuard.OR })
-  @UseGuards(AuthenticationGuard)
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   async refreshToken(@Body() body: RefreshTokenBodyDTO) {
