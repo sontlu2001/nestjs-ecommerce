@@ -12,3 +12,9 @@ export const ConditionGuard = {
   OR: 'OR',
 } as const;
 export type ConditionGuardKey = keyof typeof ConditionGuard;
+
+export const UserStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  BLOCKED: 'BLOCKED',
+} as const;

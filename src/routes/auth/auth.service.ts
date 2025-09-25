@@ -4,33 +4,28 @@ import { HashingService } from 'src/shared/services/hasing.service';
 import { PrismaService } from 'src/shared/services/prisma.service';
 import { TokenService } from 'src/shared/services/token.service';
 import { RolesService } from './roles.service';
+import { RegisterReqType } from './auth.model';
+import { AuthRepository } from './auth.repo';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly hashingService: HashingService,
-    private readonly prismaService: PrismaService,
     private readonly rolesService: RolesService,
+    private readonly authRepository: AuthRepository,
   ) {}
 
-  async register(data: any) {
+  async register(data: RegisterReqType) {
     try {
       const clientRoleId = await this.rolesService.getClientRoleId();
       const hashedPassword = await this.hashingService.hash(data.password);
-      const user = await this.prismaService.user.create({
-        data: {
-          email: data.email,
-          password: hashedPassword,
-          name: data.name,
-          phoneNumber: data.phoneNumber,
-          roleId: clientRoleId,
-        },
-        omit: {
-          password: true,
-          totpSecret: true,
-        },
+      return await this.authRepository.createUser({
+        email: data.email,
+        name: data.name,
+        phoneNumber: data.phoneNumber,
+        password: hashedPassword,
+        roleId: clientRoleId,
       });
-      return user;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
