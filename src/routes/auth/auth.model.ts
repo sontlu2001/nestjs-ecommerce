@@ -1,23 +1,8 @@
-import { UserStatus } from 'src/shared/constants/auth.contant';
+import { VerificationCode } from 'src/shared/constants/auth.contant';
+import { UserSchema } from 'src/shared/models/share-user.model';
 import z from 'zod';
 
-const UserShema = z.object({
-  id: z.number(),
-  email: z.string().email(),
-  name: z.string().min(2).max(100),
-  password: z.string().min(6).max(100),
-  phoneNumber: z.string().min(10).max(15),
-  avatar: z.string().nullable(),
-  totpSecret: z.string().nullable(),
-  status: z.enum(UserStatus),
-  roleId: z.number(),
-  createdById: z.number().nullable(),
-  updatedById: z.number().nullable(),
-  createdAt: z.date(),
-  deletedAt: z.date().nullable(),
-});
-
-export const RegisterReqSchema = UserShema.pick({
+export const RegisterReqSchema = UserSchema.pick({
   name: true,
   email: true,
   password: true,
@@ -25,6 +10,7 @@ export const RegisterReqSchema = UserShema.pick({
 })
   .extend({
     confirmPassword: z.string().min(6).max(100),
+    code: z.string().length(6),
   })
   .strict()
   .superRefine(({ password, confirmPassword }, ctx) => {
@@ -37,11 +23,27 @@ export const RegisterReqSchema = UserShema.pick({
     }
   });
 
-export const RegisterResSchema = UserShema.omit({
+export const RegisterResSchema = UserSchema.omit({
   password: true,
   totpSecret: true,
 });
 
-export type UserType = z.infer<typeof UserShema>;
+export type UserType = z.infer<typeof UserSchema>;
 export type RegisterReqType = z.infer<typeof RegisterReqSchema>;
 export type RegisterResType = z.infer<typeof RegisterResSchema>;
+
+export const VerificationCodeSchema = z.object({
+  id: z.number(),
+  email: z.string().email(),
+  code: z.string().length(6),
+  type: z.enum([VerificationCode.REGISTER, VerificationCode.FORGOT_PASSWORD]),
+  expiresAt: z.date(),
+  createdAt: z.date(),
+});
+export type VerificationCodeType = z.infer<typeof VerificationCodeSchema>;
+
+export const SendOTPBodySchema = VerificationCodeSchema.pick({
+  email: true,
+  type: true,
+}).strict();
+export type SendOTPBodyType = z.infer<typeof SendOTPBodySchema>;
