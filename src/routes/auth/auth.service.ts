@@ -1,3 +1,4 @@
+import { UserAgent } from 'src/shared/decorators/user-agent.decorator';
 import {
   ConflictException,
   Injectable,
@@ -8,7 +9,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { HashingService } from 'src/shared/services/hasing.service';
 import { RolesService } from './roles.service';
-import { LoginReqType, LoginResType, RegisterReqType, SendOTPBodyType } from './auth.model';
+import { LoginReqType, LoginResType, RefreshTokenBodyType, RegisterReqType, SendOTPBodyType } from './auth.model';
 import { AuthRepository } from './auth.repo';
 import { ShareUserRepository } from 'src/shared/repositories/share-user.repo';
 import { generateOTP } from 'src/shared/helpers';
@@ -163,12 +164,47 @@ export class AuthService {
       token: refreshToken,
       userId: userId,
       expiresAt: decodeRefreshToken.exp ? new Date(decodeRefreshToken.exp * 1000) : new Date(),
-      deviceId: deviceId || undefined,
+      deviceId: deviceId,
     });
 
     return {
       accessToken,
       refreshToken,
     };
+  }
+
+  async refreshToken({ refreshToken, userAgent, ip }: RefreshTokenBodyType & { userAgent: string; ip: string }) {
+    try {
+      // check token is valid
+      const { userId } = await this.tokenService.verifyRefreshToken(refreshToken);
+      // check token is in db
+      const storedRefreshToken = await this.authRepository.findUniqueRefreshTokenIncludeUserRole({
+        token: refreshToken,
+      });
+
+      // get user role info
+      const {
+        deviceId,
+        user: { roleId, name: roleName },
+      } = storedRefreshToken;
+
+      // update device last active
+      const $updateDevice = this.authRepository.updateDeviceLastActive(deviceId, {
+        ipAddress: ip,
+        userAgent: userAgent,
+      });
+
+      // delete old refresh token
+      const $deleteRefreshToken = this.authRepository.deleteRefreshTokenById({ token: refreshToken });
+
+      // generate new tokens
+      const $device = this.generateTokens({ userId, deviceId, roleId, roleName });
+
+      const [, , tokens] = await Promise.all([$updateDevice, $deleteRefreshToken, $device]);
+      return tokens;
+    } catch (error) {
+      Logger.error('Failed to refresh token: ' + error.message);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 }

@@ -60,6 +60,7 @@ export class TokenService {
           token: refreshToken,
           userId: payload.userId,
           expiresAt: new Date(decodeRefreshToken.exp * 1000),
+          deviceId: payload.deviceId,
         },
       });
 

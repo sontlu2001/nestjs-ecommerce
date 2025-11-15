@@ -1,7 +1,9 @@
 import {
   DeviceShema,
   LoginBodySchema,
+  LoginResSchema,
   RefreshTokenBodySchema,
+  RefreshTokenResSchema,
   RegisterReqSchema,
   RegisterResSchema,
   SendOTPBodySchema,
@@ -12,5 +14,7 @@ export class RegisterReqDTO extends createZodDto(RegisterReqSchema) {}
 export class RegisterResDTO extends createZodDto(RegisterResSchema) {}
 export class SendOTPBodyDTO extends createZodDto(SendOTPBodySchema) {}
 export class LoginBodyDTO extends createZodDto(LoginBodySchema) {}
-export class RefreshTokenBodyType extends createZodDto(RefreshTokenBodySchema) {}
+export class LoginBodyResDTO extends createZodDto(LoginResSchema) {}
+export class RefreshTokenBodyDTO extends createZodDto(RefreshTokenBodySchema) {}
+export class RefreshTokenResDTO extends createZodDto(RefreshTokenResSchema) {}
 export class DeviceBodyType extends createZodDto(DeviceShema) {}
