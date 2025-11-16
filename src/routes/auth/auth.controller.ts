@@ -45,4 +45,10 @@ export class AuthController {
       ip: ipAddress,
     });
   }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Body() body: RefreshTokenBodyDTO) {
+    return this.authService.logout(body.refreshToken);
+  }
 }

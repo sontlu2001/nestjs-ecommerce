@@ -207,4 +207,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
+
+  async logout(refreshToken: string) {
+    try {
+      await this.tokenService.verifyRefreshToken(refreshToken);
+      const deletedRefreshToken = await this.authRepository.deleteRefreshTokenById({ token: refreshToken });
+      await this.authRepository.updateDeviceLastActive(deletedRefreshToken.deviceId, {
+        isActive: false,
+      });
+      return { message: 'Logged out successfully' };
+    } catch (error) {
+      Logger.error('Failed to verify refresh token during logout: ' + error.message);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
 }
