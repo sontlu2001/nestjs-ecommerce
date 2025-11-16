@@ -107,7 +107,7 @@ export class AuthService {
       ]);
     }
 
-    return newVerificationCode;
+    return { message: 'OTP sent successfully' };
   }
 
   async login(data: LoginReqType) {
