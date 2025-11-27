@@ -1,3 +1,4 @@
+import { email } from 'zod';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/shared/services/prisma.service';
 import { DeviceType, RefreshTokenType, RegisterReqType, RoleType, UserType, VerificationCodeType } from './auth.model';
@@ -28,6 +29,7 @@ export class AuthRepository {
       update: {
         code: payload.code,
         expiresAt: payload.expiresAt,
+        type: payload.type,
       },
     });
   }
@@ -98,6 +100,23 @@ export class AuthRepository {
   async deleteRefreshTokenById(uniqueObj: { token: string }): Promise<RefreshTokenType> {
     return await this.prismaService.refreshToken.delete({
       where: uniqueObj,
+    });
+  }
+
+  updateUser(where: { id: number } | { email: string }, data: Partial<UserType>): Promise<UserType> {
+    return this.prismaService.user.update({
+      where,
+      data,
+    });
+  }
+
+  deleteVerificationCode(where: {
+    code: string;
+    email: string;
+    type: TypeOfVerificationCode;
+  }): Promise<VerificationCodeType> {
+    return this.prismaService.verificationCode.delete({
+      where,
     });
   }
 }

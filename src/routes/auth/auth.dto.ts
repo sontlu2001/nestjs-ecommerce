@@ -1,5 +1,6 @@
 import {
   DeviceShema,
+  ForgotPasswordBodySchema,
   LoginBodySchema,
   LoginResSchema,
   RefreshTokenBodySchema,
@@ -18,3 +19,4 @@ export class LoginBodyResDTO extends createZodDto(LoginResSchema) {}
 export class RefreshTokenBodyDTO extends createZodDto(RefreshTokenBodySchema) {}
 export class RefreshTokenResDTO extends createZodDto(RefreshTokenResSchema) {}
 export class DeviceBodyType extends createZodDto(DeviceShema) {}
+export class ForgotPasswordBodyDTO extends createZodDto(ForgotPasswordBodySchema) {}

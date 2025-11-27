@@ -1,6 +1,6 @@
 import { VerificationCode } from 'src/shared/constants/auth.contant';
 import { UserSchema } from 'src/shared/models/share-user.model';
-import z from 'zod';
+import z, { email } from 'zod';
 
 export const RegisterReqSchema = UserSchema.pick({
   name: true,
@@ -101,6 +101,24 @@ export const RefreshTokenSchema = z
   })
   .strict();
 
+export const ForgotPasswordBodySchema = z
+  .object({
+    email: z.string().email(),
+    code: z.string().length(6),
+    newPassword: z.string().min(6).max(100),
+    confirmNewPassword: z.string().min(6).max(100),
+  })
+  .strict()
+  .superRefine(({ newPassword, confirmNewPassword }, ctx) => {
+    if (newPassword !== confirmNewPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Error.PasswordsDoNotMatch',
+        path: ['confirmNewPassword'],
+      });
+    }
+  });
+
 export type UserType = z.infer<typeof UserSchema>;
 export type RegisterReqType = z.infer<typeof RegisterReqSchema>;
 export type RegisterResType = z.infer<typeof RegisterResSchema>;
@@ -113,3 +131,4 @@ export type RefreshTokenBodyType = z.infer<typeof RefreshTokenBodySchema>;
 export type RefreshTokenResType = z.infer<typeof RefreshTokenResSchema>;
 export type RefreshTokenType = z.infer<typeof RefreshTokenSchema>;
 export type DeviceType = z.infer<typeof DeviceShema>;
+export type ForgotPasswordBodyType = z.infer<typeof ForgotPasswordBodySchema>;

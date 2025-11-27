@@ -2,6 +2,7 @@ import { Body, Controller, HttpCode, HttpStatus, Ip, Post } from '@nestjs/common
 import { AuthService } from './auth.service';
 import { ZodSerializerDto } from 'nestjs-zod';
 import {
+  ForgotPasswordBodyDTO,
   LoginBodyDTO,
   LoginBodyResDTO,
   RefreshTokenBodyDTO,
@@ -55,5 +56,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(@Body() body: RefreshTokenBodyDTO) {
     return this.authService.logout(body.refreshToken);
+  }
+
+  @Post('forgot-password')
+  @IsPublic()
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() body: ForgotPasswordBodyDTO) {
+    return await this.authService.forgotPassword(body);
   }
 }

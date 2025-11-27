@@ -1,15 +1,15 @@
-import { UserAgent } from 'src/shared/decorators/user-agent.decorator';
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { HashingService } from 'src/shared/services/hasing.service';
 import { RolesService } from './roles.service';
-import { LoginReqType, LoginResType, RefreshTokenBodyType, RegisterReqType, SendOTPBodyType } from './auth.model';
+import {
+  ForgotPasswordBodyType,
+  LoginReqType,
+  LoginResType,
+  RefreshTokenBodyType,
+  RegisterReqType,
+  SendOTPBodyType,
+} from './auth.model';
 import { AuthRepository } from './auth.repo';
 import { ShareUserRepository } from 'src/shared/repositories/share-user.repo';
 import { generateOTP } from 'src/shared/helpers';
@@ -18,6 +18,15 @@ import ms from 'ms';
 import { VerificationCode } from 'src/shared/constants/auth.contant';
 import { EmailService } from 'src/shared/services/email.service';
 import { TokenService } from 'src/shared/services/token.service';
+import {
+  EmailAlreadyExistsError,
+  EmailNotFoundError,
+  ExpiredVerificationCodeError,
+  InvalidEmailOrPasswordError,
+  InvalidRefreshTokenError,
+  InvalidVerificationCodeError,
+  OTPEmailSendError,
+} from './auth.error.model';
 
 @Injectable()
 export class AuthService {
@@ -39,36 +48,35 @@ export class AuthService {
       });
 
       if (!verificationCode) {
-        throw new UnprocessableEntityException([
-          {
-            message: 'Invalid verification code',
-            path: 'code',
-          },
-        ]);
+        throw InvalidVerificationCodeError;
       }
 
       if (verificationCode.expiresAt < new Date()) {
-        throw new UnprocessableEntityException([
-          {
-            message: 'Verification code has expired',
-            path: 'code',
-          },
-        ]);
+        throw ExpiredVerificationCodeError;
       }
 
       const clientRoleId = await this.rolesService.getClientRoleId();
       const hashedPassword = await this.hashingService.hash(data.password);
-      return await this.authRepository.createUser({
-        email: data.email,
-        name: data.name,
-        phoneNumber: data.phoneNumber,
-        password: hashedPassword,
-        roleId: clientRoleId,
-      });
+      const [user] = await Promise.all([
+        this.authRepository.createUser({
+          email: data.email,
+          name: data.name,
+          phoneNumber: data.phoneNumber,
+          password: hashedPassword,
+          roleId: clientRoleId,
+        }),
+        this.authRepository.deleteVerificationCode({
+          email: data.email,
+          code: data.code,
+          type: VerificationCode.REGISTER,
+        }),
+      ]);
+
+      return user;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new ConflictException('Email already exists');
+          throw EmailAlreadyExistsError;
         }
       }
       throw error;
@@ -77,13 +85,17 @@ export class AuthService {
 
   async sendOTP(data: SendOTPBodyType) {
     const user = await this.shareUserRepository.findUserUnique({ email: data.email });
-    console.log(user);
-    if (user) {
-      throw new ConflictException('Email already exists');
+
+    if (data.type === VerificationCode.REGISTER && user) {
+      throw EmailAlreadyExistsError;
+    }
+
+    if (data.type === VerificationCode.FORGOT_PASSWORD && !user) {
+      throw EmailNotFoundError;
     }
 
     const otp = generateOTP();
-    const newVerificationCode = await this.authRepository.createVerificationCode({
+    await this.authRepository.createVerificationCode({
       email: data.email,
       code: otp.toString(),
       type: data.type,
@@ -99,12 +111,7 @@ export class AuthService {
 
     if (error) {
       Logger.error('Failed to send OTP email', JSON.stringify(error));
-      throw new UnprocessableEntityException([
-        {
-          message: 'Failed to send OTP email',
-          path: 'email',
-        },
-      ]);
+      throw OTPEmailSendError;
     }
 
     return { message: 'OTP sent successfully' };
@@ -113,11 +120,11 @@ export class AuthService {
   async login(data: LoginReqType) {
     const user = await this.authRepository.findUniqueUserIncludeRole({ email: data.email });
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw InvalidEmailOrPasswordError;
     }
     const isPasswordValid = await this.hashingService.compare(data.password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw InvalidEmailOrPasswordError;
     }
 
     const device = await this.authRepository.createDevice({
@@ -204,7 +211,7 @@ export class AuthService {
       return tokens;
     } catch (error) {
       Logger.error('Failed to refresh token: ' + error.message);
-      throw new UnauthorizedException('Invalid refresh token');
+      throw InvalidRefreshTokenError;
     }
   }
 
@@ -218,7 +225,38 @@ export class AuthService {
       return { message: 'Logged out successfully' };
     } catch (error) {
       Logger.error('Failed to verify refresh token during logout: ' + error.message);
-      throw new UnauthorizedException('Invalid refresh token');
+      throw InvalidRefreshTokenError;
     }
+  }
+
+  async forgotPassword(data: ForgotPasswordBodyType) {
+    const user = await this.shareUserRepository.findUserUnique({ email: data.email });
+    if (!user) {
+      throw EmailNotFoundError;
+    }
+    const verificationCode = await this.authRepository.findVerificationCode({
+      email: data.email,
+      code: data.code,
+      type: VerificationCode.FORGOT_PASSWORD,
+    });
+
+    if (!verificationCode) {
+      throw InvalidVerificationCodeError;
+    }
+
+    if (verificationCode.expiresAt < new Date()) {
+      throw ExpiredVerificationCodeError;
+    }
+
+    const hashedPassword = await this.hashingService.hash(data.newPassword);
+    await Promise.all([
+      this.authRepository.updateUser({ email: data.email }, { password: hashedPassword }),
+      this.authRepository.deleteVerificationCode({
+        email: data.email,
+        code: data.code,
+        type: VerificationCode.FORGOT_PASSWORD,
+      }),
+    ]);
+    return { message: 'Password reset successfully' };
   }
 }
