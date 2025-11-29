@@ -26,7 +26,9 @@ import {
   InvalidRefreshTokenError,
   InvalidVerificationCodeError,
   OTPEmailSendError,
+  TOTPAlreadyEnabledException,
 } from './auth.error.model';
+import { TwoFactorService } from 'src/shared/services/2fa.service';
 
 @Injectable()
 export class AuthService {
@@ -37,14 +39,17 @@ export class AuthService {
     private readonly shareUserRepository: ShareUserRepository,
     private readonly emailService: EmailService,
     private readonly tokenService: TokenService,
+    private readonly twoFactorAuthService: TwoFactorService,
   ) {}
 
   async register(data: RegisterReqType) {
     try {
       const verificationCode = await this.authRepository.findVerificationCode({
-        email: data.email,
-        code: data.code,
-        type: VerificationCode.REGISTER,
+        email_code_type: {
+          email: data.email,
+          code: data.code,
+          type: VerificationCode.REGISTER,
+        },
       });
 
       if (!verificationCode) {
@@ -66,9 +71,11 @@ export class AuthService {
           roleId: clientRoleId,
         }),
         this.authRepository.deleteVerificationCode({
-          email: data.email,
-          code: data.code,
-          type: VerificationCode.REGISTER,
+          email_code_type: {
+            email: data.email,
+            code: data.code,
+            type: VerificationCode.REGISTER,
+          },
         }),
       ]);
 
@@ -235,9 +242,11 @@ export class AuthService {
       throw EmailNotFoundError;
     }
     const verificationCode = await this.authRepository.findVerificationCode({
-      email: data.email,
-      code: data.code,
-      type: VerificationCode.FORGOT_PASSWORD,
+      email_code_type: {
+        email: data.email,
+        code: data.code,
+        type: VerificationCode.FORGOT_PASSWORD,
+      },
     });
 
     if (!verificationCode) {
@@ -252,11 +261,36 @@ export class AuthService {
     await Promise.all([
       this.authRepository.updateUser({ email: data.email }, { password: hashedPassword }),
       this.authRepository.deleteVerificationCode({
-        email: data.email,
-        code: data.code,
-        type: VerificationCode.FORGOT_PASSWORD,
+        email_code_type: {
+          email: data.email,
+          code: data.code,
+          type: VerificationCode.FORGOT_PASSWORD,
+        },
       }),
     ]);
     return { message: 'Password reset successfully' };
+  }
+
+  async setupTwoFactorAuth(userId: number) {
+    // get user info
+    const user = await this.shareUserRepository.findUserUnique({ id: userId });
+    if (!user) {
+      throw EmailNotFoundError;
+    }
+
+    // check if TOTP is already enabled
+    if (user.totpSecret) {
+      throw TOTPAlreadyEnabledException;
+    }
+
+    // generate TOTP secret
+    const { secret, uri } = this.twoFactorAuthService.generateTOPTSecret(user.email);
+    // save TOTP secret to user
+    await this.authRepository.updateUser({ id: userId }, { totpSecret: secret });
+
+    return {
+      secret,
+      uri,
+    };
   }
 }

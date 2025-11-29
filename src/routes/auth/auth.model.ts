@@ -32,7 +32,12 @@ export const VerificationCodeSchema = z.object({
   id: z.number(),
   email: z.string().email(),
   code: z.string().length(6),
-  type: z.enum([VerificationCode.REGISTER, VerificationCode.FORGOT_PASSWORD]),
+  type: z.enum([
+    VerificationCode.REGISTER,
+    VerificationCode.FORGOT_PASSWORD,
+    VerificationCode.LOGIN,
+    VerificationCode.DISABLE_2FA,
+  ]),
   expiresAt: z.date(),
   createdAt: z.date(),
 });
@@ -48,6 +53,10 @@ export const LoginBodySchema = z
     password: z.string().min(6).max(100),
     userAgent: z.string().optional(),
     ipAddress: z.string().optional(),
+  })
+  .extend({
+    totpCode: z.string().length(6).optional(), // For 2FA
+    code: z.string().length(6).optional(), // For login with OTP
   })
   .strict();
 
@@ -119,6 +128,28 @@ export const ForgotPasswordBodySchema = z
     }
   });
 
+export const DisableTwoFactorBodySchema = z
+  .object({
+    totpCode: z.string().length(6).optional(),
+    code: z.string().length(6).optional(),
+  })
+  .superRefine(({ totpCode, code }, ctx) => {
+    if ((totpCode !== undefined) === (code !== undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['totpCode'],
+        message: 'Either TOTP code or verification code must be provided',
+      });
+    }
+  });
+
+export const TwoFactorSetupResSchema = z
+  .object({
+    secret: z.string(),
+    uri: z.string(),
+  })
+  .strict();
+
 export type UserType = z.infer<typeof UserSchema>;
 export type RegisterReqType = z.infer<typeof RegisterReqSchema>;
 export type RegisterResType = z.infer<typeof RegisterResSchema>;
@@ -132,3 +163,5 @@ export type RefreshTokenResType = z.infer<typeof RefreshTokenResSchema>;
 export type RefreshTokenType = z.infer<typeof RefreshTokenSchema>;
 export type DeviceType = z.infer<typeof DeviceShema>;
 export type ForgotPasswordBodyType = z.infer<typeof ForgotPasswordBodySchema>;
+export type DisableTwoFactorBodyType = z.infer<typeof DisableTwoFactorBodySchema>;
+export type TwoFactorSetupResType = z.infer<typeof TwoFactorSetupResSchema>;

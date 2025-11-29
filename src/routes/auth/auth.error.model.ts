@@ -13,3 +13,9 @@ export const InvalidEmailOrPasswordError = new UnprocessableEntityException('Err
 export const InvalidRefreshTokenError = new UnprocessableEntityException('Error.InvalidRefreshToken');
 
 export const EmailNotFoundError = new UnprocessableEntityException('Error.EmailNotFoundError');
+
+export const TOTPAlreadyEnabledException = new UnprocessableEntityException('Error.TOTPAlreadyEnabledException');
+
+export const TOTPNotEnabledException = new UnprocessableEntityException('Error.TOTPNotEnabledException');
+
+export const InvalidTOTPCodeException = new UnprocessableEntityException('Error.InvalidTOTPCodeException');

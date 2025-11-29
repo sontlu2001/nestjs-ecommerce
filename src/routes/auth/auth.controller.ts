@@ -10,9 +10,12 @@ import {
   RegisterReqDTO,
   RegisterResDTO,
   SendOTPBodyDTO,
+  TwoFactorSetupResDTO,
 } from './auth.dto';
 import { UserAgent } from 'src/shared/decorators/user-agent.decorator';
 import { IsPublic } from 'src/shared/decorators/auth.decorator';
+import { EmptyBodyDTO } from 'src/shared/dtos/request.dto';
+import { ActiveUser } from 'src/shared/decorators/active-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -63,5 +66,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() body: ForgotPasswordBodyDTO) {
     return await this.authService.forgotPassword(body);
+  }
+
+  @Post('2fa/setup')
+  @ZodSerializerDto(TwoFactorSetupResDTO)
+  setupTwoFactorAuth(@Body() _: EmptyBodyDTO, @ActiveUser('userId') userId: number) {
+    return this.authService.setupTwoFactorAuth(userId);
   }
 }
