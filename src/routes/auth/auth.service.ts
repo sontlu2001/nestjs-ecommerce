@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Type } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { HashingService } from 'src/shared/services/hasing.service';
 import { RolesService } from './roles.service';
@@ -15,7 +15,7 @@ import { ShareUserRepository } from 'src/shared/repositories/share-user.repo';
 import { generateOTP } from 'src/shared/helpers';
 import { addMilliseconds } from 'date-fns';
 import ms from 'ms';
-import { VerificationCode } from 'src/shared/constants/auth.contant';
+import { TypeOfVerificationCode, VerificationCode } from 'src/shared/constants/auth.contant';
 import { EmailService } from 'src/shared/services/email.service';
 import { TokenService } from 'src/shared/services/token.service';
 import {
@@ -24,11 +24,15 @@ import {
   ExpiredVerificationCodeError,
   InvalidEmailOrPasswordError,
   InvalidRefreshTokenError,
+  InvalidTOTPAndCodeException,
+  InvalidTOTPException,
   InvalidVerificationCodeError,
   OTPEmailSendError,
   TOTPAlreadyEnabledException,
+  TOTPNotEnabledException,
 } from './auth.error.model';
 import { TwoFactorService } from 'src/shared/services/2fa.service';
+import { DisableTwoFactorBodyDTO } from './auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -125,7 +129,10 @@ export class AuthService {
   }
 
   async login(data: LoginReqType) {
+    // validate user email and password
     const user = await this.authRepository.findUniqueUserIncludeRole({ email: data.email });
+    Logger.log('User fetched for login: ' + JSON.stringify(user));
+
     if (!user) {
       throw InvalidEmailOrPasswordError;
     }
@@ -134,12 +141,40 @@ export class AuthService {
       throw InvalidEmailOrPasswordError;
     }
 
+    // if user has TOTP enabled, verify TOTP code or OTP code
+    if (user.totpSecret) {
+      if (!data.totpCode) {
+        throw InvalidTOTPAndCodeException;
+      }
+
+      // verify TOTP code
+      if (data.totpCode) {
+        const isTOTPValid = this.twoFactorAuthService.verifyTOPT({
+          email: user.email,
+          secret: user.totpSecret,
+          token: data.totpCode,
+        });
+        if (!isTOTPValid) {
+          throw InvalidTOTPException;
+        }
+      } else if (data.code) {
+        // verify OTP code
+        await this.validateVerificationCode({
+          email: data.email,
+          code: data.code,
+          type: VerificationCode.LOGIN,
+        });
+      }
+    }
+
+    // create device
     const device = await this.authRepository.createDevice({
       userId: user.id,
       userAgent: data.userAgent || '',
       ipAddress: data.ipAddress || '',
     });
 
+    // generate tokens
     const tokens = await this.generateTokens({
       userId: user.id,
       deviceId: device.id,
@@ -292,5 +327,61 @@ export class AuthService {
       secret,
       uri,
     };
+  }
+
+  async validateVerificationCode({ email, code, type }: { email: string; code: string; type: TypeOfVerificationCode }) {
+    const verificationCode = await this.authRepository.findVerificationCode({
+      email_code_type: {
+        email,
+        code,
+        type,
+      },
+    });
+
+    if (!verificationCode) {
+      throw InvalidVerificationCodeError;
+    }
+
+    if (verificationCode.expiresAt < new Date()) {
+      throw ExpiredVerificationCodeError;
+    }
+    return true;
+  }
+
+  async disableTwoFactorAuth(data: DisableTwoFactorBodyDTO & { userId: number }) {
+    const { code, totpCode, userId } = data;
+
+    // get user info
+    const user = await this.shareUserRepository.findUserUnique({ id: userId });
+    if (!user) {
+      throw EmailNotFoundError;
+    }
+    Logger.log(`Disabling 2FA for user: ${user.email}`);
+    // check if TOTP is enabled
+    if (!user.totpSecret) {
+      throw TOTPNotEnabledException;
+    }
+    // verify TOTP code
+    if (totpCode) {
+      const isTOTPValid = this.twoFactorAuthService.verifyTOPT({
+        email: user.email,
+        secret: user.totpSecret,
+        token: totpCode,
+      });
+
+      if (!isTOTPValid) {
+        throw InvalidTOTPException;
+      } else if (code) {
+        await this.validateVerificationCode({
+          email: user.email,
+          code: code,
+          type: VerificationCode.DISABLE_2FA,
+        });
+      }
+
+      // disable TOTP
+      await this.authRepository.updateUser({ id: userId }, { totpSecret: null });
+      return { message: 'Two-factor authentication disabled successfully' };
+    }
   }
 }

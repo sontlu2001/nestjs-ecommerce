@@ -18,4 +18,6 @@ export const TOTPAlreadyEnabledException = new UnprocessableEntityException('Err
 
 export const TOTPNotEnabledException = new UnprocessableEntityException('Error.TOTPNotEnabledException');
 
-export const InvalidTOTPCodeException = new UnprocessableEntityException('Error.InvalidTOTPCodeException');
+export const InvalidTOTPAndCodeException = new UnprocessableEntityException('Error.InvalidTOTPAndCodeException');
+
+export const InvalidTOTPException = new UnprocessableEntityException('Error.InvalidTOTPException');
