@@ -3,17 +3,26 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SharedModule } from './shared/shared.module';
 import { AuthModule } from './routes/auth/auth.module';
-import { APP_INTERCEPTOR } from '@nestjs/core';
-import { PostsModule } from './routes/posts/posts.module';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
 
 @Module({
-  imports: [SharedModule, AuthModule, PostsModule],
+  imports: [SharedModule, AuthModule],
   controllers: [AppController],
   providers: [
     AppService,
     {
+      provide: APP_PIPE,
+      useClass: ZodValidationPipe,
+    },
+    {
       provide: APP_INTERCEPTOR,
-      useClass: ClassSerializerInterceptor,
+      useClass: ZodSerializerInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
     },
   ],
 })

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from '../types/jwt.type';
+import { AccessTokenDecoded, AccessTokenPayload, RefreshTokenDecoded, RefreshTokenPayload } from '../types/jwt.type';
 import { PrismaService } from './prisma.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class TokenService {
@@ -10,37 +11,43 @@ export class TokenService {
     private readonly prismaService: PrismaService,
   ) {}
 
-  signAccessToken(payload: { userId: number }) {
-    return this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_TOKEN_SECRET,
-      expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRATION_TIME,
-      algorithm: 'HS256',
-    });
+  signAccessToken(payload: AccessTokenPayload) {
+    return this.jwtService.signAsync(
+      { ...payload, id: randomUUID() },
+      {
+        secret: process.env.JWT_ACCESS_TOKEN_SECRET,
+        expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRATION_TIME,
+        algorithm: 'HS256',
+      },
+    );
   }
 
-  signRefreshToken(payload: { userId: number }) {
-    return this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_TOKEN_SECRET,
-      expiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRATION_TIME,
-      algorithm: 'HS256',
-    });
+  signRefreshToken(payload: RefreshTokenPayload) {
+    return this.jwtService.signAsync(
+      { ...payload, id: randomUUID() },
+      {
+        secret: process.env.JWT_REFRESH_TOKEN_SECRET,
+        expiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRATION_TIME,
+        algorithm: 'HS256',
+      },
+    );
   }
 
-  verifyAccessToken(token: string): Promise<JwtPayload> {
+  verifyAccessToken(token: string): Promise<AccessTokenDecoded> {
     return this.jwtService.verifyAsync(token, {
       secret: process.env.JWT_ACCESS_TOKEN_SECRET,
       algorithms: ['HS256'],
     });
   }
 
-  verifyRefreshToken(token: string): Promise<JwtPayload> {
+  verifyRefreshToken(token: string): Promise<RefreshTokenDecoded> {
     return this.jwtService.verifyAsync(token, {
       secret: process.env.JWT_REFRESH_TOKEN_SECRET,
       algorithms: ['HS256'],
     });
   }
 
-  async generateTokens(payload: { userId: number }) {
+  async generateTokens(payload: AccessTokenPayload) {
     {
       const [accessToken, refreshToken] = await Promise.all([
         this.signAccessToken(payload),
@@ -53,6 +60,7 @@ export class TokenService {
           token: refreshToken,
           userId: payload.userId,
           expiresAt: new Date(decodeRefreshToken.exp * 1000),
+          deviceId: payload.deviceId,
         },
       });
 

@@ -1,58 +1,26 @@
-import { Exclude } from 'class-transformer';
-import { IsString } from 'class-validator';
-import { Match } from 'src/shared/decorators/matched-password';
+import {
+  DeviceShema,
+  DisableTwoFactorBodySchema,
+  ForgotPasswordBodySchema,
+  LoginBodySchema,
+  LoginResSchema,
+  RefreshTokenBodySchema,
+  RefreshTokenResSchema,
+  RegisterReqSchema,
+  RegisterResSchema,
+  SendOTPBodySchema,
+  TwoFactorSetupResSchema,
+} from './auth.model';
+import { createZodDto } from 'nestjs-zod';
 
-export class LoginDTO {
-  @IsString()
-  email: string;
-
-  @IsString()
-  password: string;
-}
-
-export class RegisterDTO extends LoginDTO {
-  @IsString()
-  name: string;
-
-  @IsString()
-  @Match('password', { message: 'Passwords do not match' })
-  confirmPassword: string;
-}
-
-export class RegisterResDTO {
-  userId: number;
-  email: string;
-  name: string;
-  @Exclude() password: string;
-  createdAt: Date;
-  updatedAt: Date;
-
-  constructor(partial: Partial<RegisterResDTO>) {
-    Object.assign(this, partial);
-  }
-}
-
-export class LoginResDTO {
-  accessToken: string;
-  refreshToken: string;
-
-  constructor(partial: Partial<LoginResDTO>) {
-    Object.assign(this, partial);
-  }
-}
-
-export class RefreshTokenBodyDTO {
-  @IsString()
-  refreshToken: string;
-}
-
-export class RefreshTokenResDTO extends LoginResDTO {}
-
-export class LogoutBodyDTO extends RefreshTokenBodyDTO {}
-
-export class LogoutResDTO {
-  message: string;
-  constructor(partial: Partial<LogoutResDTO>) {
-    Object.assign(this, partial);
-  }
-}
+export class RegisterReqDTO extends createZodDto(RegisterReqSchema) {}
+export class RegisterResDTO extends createZodDto(RegisterResSchema) {}
+export class SendOTPBodyDTO extends createZodDto(SendOTPBodySchema) {}
+export class LoginBodyDTO extends createZodDto(LoginBodySchema) {}
+export class LoginBodyResDTO extends createZodDto(LoginResSchema) {}
+export class RefreshTokenBodyDTO extends createZodDto(RefreshTokenBodySchema) {}
+export class RefreshTokenResDTO extends createZodDto(RefreshTokenResSchema) {}
+export class DeviceBodyType extends createZodDto(DeviceShema) {}
+export class ForgotPasswordBodyDTO extends createZodDto(ForgotPasswordBodySchema) {}
+export class TwoFactorSetupResDTO extends createZodDto(TwoFactorSetupResSchema) {}
+export class DisableTwoFactorBodyDTO extends createZodDto(DisableTwoFactorBodySchema) {}

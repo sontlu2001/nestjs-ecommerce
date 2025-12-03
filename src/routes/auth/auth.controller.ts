@@ -1,44 +1,86 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Ip, Logger, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { ZodSerializerDto } from 'nestjs-zod';
 import {
-  LoginDTO,
-  LoginResDTO,
-  LogoutBodyDTO,
-  LogoutResDTO,
+  DisableTwoFactorBodyDTO,
+  ForgotPasswordBodyDTO,
+  LoginBodyDTO,
+  LoginBodyResDTO,
   RefreshTokenBodyDTO,
   RefreshTokenResDTO,
-  RegisterDTO,
+  RegisterReqDTO,
   RegisterResDTO,
+  SendOTPBodyDTO,
+  TwoFactorSetupResDTO,
 } from './auth.dto';
-import { Auth } from 'src/shared/decorators/auth.decorator';
-import { AuthType, ConditionGuard } from 'src/shared/constants/auth.contant';
-import { AuthenticationGuard } from 'src/shared/guards/auth.guard';
+import { UserAgent } from 'src/shared/decorators/user-agent.decorator';
+import { IsPublic } from 'src/shared/decorators/auth.decorator';
+import { EmptyBodyDTO } from 'src/shared/dtos/request.dto';
+import { ActiveUser } from 'src/shared/decorators/active-user.decorator';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  async register(@Body() body: RegisterDTO) {
-    return new RegisterResDTO(await this.authService.register(body));
+  @IsPublic()
+  @ZodSerializerDto(RegisterResDTO)
+  async register(@Body() body: RegisterReqDTO) {
+    return this.authService.register(body);
+  }
+
+  @Post('otp')
+  @IsPublic()
+  @HttpCode(HttpStatus.OK)
+  async sendOTP(@Body() body: SendOTPBodyDTO) {
+    return this.authService.sendOTP(body);
   }
 
   @Post('login')
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
-  async login(@Body() body: LoginDTO) {
-    return new LoginResDTO(await this.authService.login(body));
+  @ZodSerializerDto(LoginBodyResDTO)
+  async login(@Body() body: LoginBodyDTO, @UserAgent() userAgent: string, @Ip() ipAddress: string) {
+    return this.authService.login({ ...body, userAgent: userAgent, ipAddress: ipAddress });
   }
 
-  @Auth([AuthType.ApiKey, AuthType.Bearer], { condition: ConditionGuard.OR })
   @Post('refresh-token')
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
-  async refreshToken(@Body() body: RefreshTokenBodyDTO) {
-    return new RefreshTokenResDTO(await this.authService.refreshToken(body.refreshToken));
+  @ZodSerializerDto(RefreshTokenResDTO)
+  async refreshToken(@Body() body: RefreshTokenBodyDTO, @UserAgent() userAgent: string, @Ip() ipAddress: string) {
+    return await this.authService.refreshToken({
+      refreshToken: body.refreshToken,
+      userAgent: userAgent,
+      ip: ipAddress,
+    });
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() body: LogoutBodyDTO) {
-    return new LogoutResDTO(await this.authService.logout(body.refreshToken));
+  async logout(@Body() body: RefreshTokenBodyDTO) {
+    return this.authService.logout(body.refreshToken);
+  }
+
+  @Post('forgot-password')
+  @IsPublic()
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() body: ForgotPasswordBodyDTO) {
+    return await this.authService.forgotPassword(body);
+  }
+
+  @Post('2fa/setup')
+  @ZodSerializerDto(TwoFactorSetupResDTO)
+  setupTwoFactorAuth(@Body() _: EmptyBodyDTO, @ActiveUser('userId') userId: number) {
+    return this.authService.setupTwoFactorAuth(userId);
+  }
+
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.OK)
+  disableTwoFactorAuth(@Body() body: DisableTwoFactorBodyDTO, @ActiveUser('userId') userId: number) {
+    return this.authService.disableTwoFactorAuth({
+      ...body,
+      userId: userId,
+    });
   }
 }
